@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>PDF to Figma</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { font-family: Arial, sans-serif; padding: 24px; }
+    input[type=file] { margin-bottom: 16px; }
+    button { padding: 8px 16px; }
+  </style>
+  <script src="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+</head>
+<body>
+  <h2>Importar PDF</h2>
+  <input type="file" id="pdf-input" accept="application/pdf" />
+  <button id="import-btn">Importar</button>
+  <script>
+    document.getElementById('import-btn').onclick = async () => {
+      const input = document.getElementById('pdf-input');
+      if (input.files.length === 0) {
+        parent.postMessage({ pluginMessage: { type: 'error', message: 'Selecione um arquivo PDF.' } }, '*');
+        return;
+      }
+      const file = input.files[0];
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await window['pdfjsLib'].getDocument({ data: arrayBuffer }).promise;
+      const page = await pdf.getPage(1);
+      const viewport = page.getViewport({ scale: 1 });
+      const textContent = await page.getTextContent();
+
+      // Extrai texto, posição e tamanho de cada item
+      const items = textContent.items.map(item => ({
+        str: item.str,
+        x: item.transform[4], // posição x
+        y: viewport.height - item.transform[5], // posição y invertida para Figma
+        fontSize: item.transform[0], // aproximação do tamanho da fonte
+        width: item.width,
+        height: item.height
+      }));
+
+      parent.postMessage({
+        pluginMessage: {
+          type: 'import-pdf-layout',
+          pdfWidth: viewport.width,
+          pdfHeight: viewport.height,
+          items
+        }
+      }, '*');
+    };
+  </script>
+</body>
+</html>
