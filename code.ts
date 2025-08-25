@@ -6,14 +6,14 @@ figma.ui.onmessage = async (msg: {
   pdfWidth?: number;
   pdfHeight?: number;
   items?: Array<{ str: string; x: number; y: number; fontSize: number; width: number; height: number }>;
+  pageNum?: number;
 }) => {
   if (msg.type === 'import-pdf-layout' && msg.items && msg.pdfWidth && msg.pdfHeight) {
-    // Cria um frame do tamanho da página do PDF
     const frame = figma.createFrame();
     frame.resize(msg.pdfWidth, msg.pdfHeight);
     frame.x = figma.viewport.center.x - msg.pdfWidth / 2;
     frame.y = figma.viewport.center.y - msg.pdfHeight / 2;
-    frame.name = "PDF Importado";
+    frame.name = `PDF Página ${msg.pageNum || 1}`;
 
     await figma.loadFontAsync({ family: "Inter", style: "Regular" });
 
@@ -24,13 +24,13 @@ figma.ui.onmessage = async (msg: {
       textNode.characters = item.str;
       textNode.fontSize = item.fontSize;
       textNode.x = item.x;
-      textNode.y = item.y - item.height; // Ajuste para alinhar ao topo
+      textNode.y = item.y - item.height;
       frame.appendChild(textNode);
     }
 
     figma.currentPage.appendChild(frame);
     figma.viewport.scrollAndZoomIntoView([frame]);
-    figma.notify('PDF importado com layout replicado!');
+    figma.notify(`Página ${msg.pageNum || 1} importada!`);
     // figma.closePlugin();
   }
 };
