@@ -1,6 +1,8 @@
 // Lógica principal do plugin PDF to Figma
 figma.showUI(__html__, { width: 400, height: 300 });
 
+let lastFrameX = figma.viewport.center.x; // Posição inicial do primeiro frame
+
 figma.ui.onmessage = async (msg: {
   type: string;
   pdfWidth?: number;
@@ -11,9 +13,13 @@ figma.ui.onmessage = async (msg: {
   if (msg.type === 'import-pdf-layout' && msg.items && msg.pdfWidth && msg.pdfHeight) {
     const frame = figma.createFrame();
     frame.resize(msg.pdfWidth, msg.pdfHeight);
-    frame.x = figma.viewport.center.x - msg.pdfWidth / 2;
-    frame.y = figma.viewport.center.y - msg.pdfHeight / 2;
+
+    // Alinha os frames no topo
+    frame.x = lastFrameX;
+    frame.y = 0;
     frame.name = `PDF Página ${msg.pageNum || 1}`;
+
+    lastFrameX += msg.pdfWidth + 40; // 40px de espaçamento entre frames
 
     await figma.loadFontAsync({ family: "Inter", style: "Regular" });
 
