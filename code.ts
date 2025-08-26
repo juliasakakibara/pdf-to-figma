@@ -7,30 +7,27 @@ figma.ui.onmessage = async (msg: {
   type: string;
   pdfWidth?: number;
   pdfHeight?: number;
-  items?: Array<{ str: string; x: number; y: number; fontSize: number; width: number; height: number }>;
+  paragraphs?: Array<{ text: string; y: number; fontSize: number }>;
   pageNum?: number;
 }) => {
-  if (msg.type === 'import-pdf-layout' && msg.items && msg.pdfWidth && msg.pdfHeight) {
+  if (msg.type === 'import-pdf-layout' && msg.paragraphs && msg.pdfWidth && msg.pdfHeight) {
     const frame = figma.createFrame();
     frame.resize(msg.pdfWidth, msg.pdfHeight);
-
-    // Alinha os frames no topo
     frame.x = lastFrameX;
     frame.y = 0;
     frame.name = `PDF Página ${msg.pageNum || 1}`;
-
-    lastFrameX += msg.pdfWidth + 40; // 40px de espaçamento entre frames
+    lastFrameX += msg.pdfWidth + 40;
 
     await figma.loadFontAsync({ family: "Inter", style: "Regular" });
 
-    for (const item of msg.items) {
-      if (item.str.trim().length === 0) continue;
+    for (const para of msg.paragraphs) {
+      if (para.text.trim().length === 0) continue;
       const textNode = figma.createText();
       textNode.fontName = { family: "Inter", style: "Regular" };
-      textNode.characters = item.str;
-      textNode.fontSize = item.fontSize;
-      textNode.x = item.x;
-      textNode.y = item.y - item.height;
+      textNode.characters = para.text;
+      textNode.fontSize = para.fontSize;
+      textNode.x = 0;
+      textNode.y = para.y;
       frame.appendChild(textNode);
     }
 

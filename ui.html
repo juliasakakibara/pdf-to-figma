@@ -26,6 +26,38 @@
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await window['pdfjsLib'].getDocument({ data: arrayBuffer }).promise;
 
+      function extractParagraphs(items) {
+        items.sort((a, b) => {
+          const yDiff = b.y - a.y;
+          if (Math.abs(yDiff) > 1) return yDiff;
+          return a.x - b.x;
+        });
+        const paragraphs = [];
+        let currentParagraph = '';
+        let lastItem = null;
+        let paragraphY = items.length > 0 ? items[0].y : 0;
+        for (const item of items) {
+          if (lastItem) {
+            const lastY = lastItem.y;
+            const currentY = item.y;
+            const yDifference = Math.abs(currentY - lastY);
+            if (yDifference > (lastItem.height * 1.5)) {
+              paragraphs.push({ text: currentParagraph.trim(), y: paragraphY, fontSize: lastItem.fontSize });
+              currentParagraph = '';
+              paragraphY = currentY;
+            } else if (item.x < lastItem.x) {
+              currentParagraph += '\n';
+            }
+          }
+          currentParagraph += item.str + ' ';
+          lastItem = item;
+        }
+        if (currentParagraph.trim() !== '') {
+          paragraphs.push({ text: currentParagraph.trim(), y: paragraphY, fontSize: lastItem ? lastItem.fontSize : 12 });
+        }
+        return paragraphs;
+      }
+
       for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
         const page = await pdf.getPage(pageNum);
         const viewport = page.getViewport({ scale: 1 });
@@ -36,15 +68,16 @@
           y: viewport.height - item.transform[5],
           fontSize: item.transform[0],
           width: item.width,
-          height: item.height
+          height: item.height,
+          hasEOL: item.hasEOL
         }));
-
+        const paragraphs = extractParagraphs(items);
         parent.postMessage({
           pluginMessage: {
             type: 'import-pdf-layout',
             pdfWidth: viewport.width,
             pdfHeight: viewport.height,
-            items,
+            paragraphs,
             pageNum
           }
         }, '*');
