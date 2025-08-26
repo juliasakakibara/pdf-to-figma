@@ -33,9 +33,9 @@
       }
       function extractParagraphs(items) {
         items.sort((a, b) => {
-          const yDiff = b.y - a.y;
+          const yDiff = a.y - b.y; // CORREÇÃO: de cima para baixo
           if (Math.abs(yDiff) > 1) return yDiff;
-          return a.x - b.x;
+          return a.x - b.x; // da esquerda para a direita
         });
         const paragraphs = [];
         let currentParagraph = '';
