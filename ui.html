@@ -14,10 +14,15 @@
 <body>
   <h2>Importar PDF</h2>
   <input type="file" id="pdf-input" accept="application/pdf" />
+  <label style="display:block;margin-bottom:8px;">
+    <input type="checkbox" id="group-toggle" checked /> Agrupar parágrafos automaticamente
+  </label>
   <button id="import-btn">Importar</button>
   <script>
     document.getElementById('import-btn').onclick = async () => {
       const input = document.getElementById('pdf-input');
+      const groupToggle = document.getElementById('group-toggle');
+      const shouldGroup = groupToggle && groupToggle.checked;
       if (input.files.length === 0) {
         parent.postMessage({ pluginMessage: { type: 'error', message: 'Selecione um arquivo PDF.' } }, '*');
         return;
@@ -33,9 +38,9 @@
       }
       function extractParagraphs(items) {
         items.sort((a, b) => {
-          const yDiff = a.y - b.y; // CORREÇÃO: de cima para baixo
+          const yDiff = a.y - b.y;
           if (Math.abs(yDiff) > 1) return yDiff;
-          return a.x - b.x; // da esquerda para a direita
+          return a.x - b.x;
         });
         const paragraphs = [];
         let currentParagraph = '';
@@ -84,13 +89,25 @@
           height: item.height,
           hasEOL: item.hasEOL
         }));
-        const paragraphs = extractParagraphs(items);
+        let payload;
+        if (shouldGroup) {
+          const paragraphs = extractParagraphs(items);
+          payload = { paragraphs };
+        } else {
+          // Sem agrupamento: cada item vira um bloco de texto
+          payload = { paragraphs: items.map(item => ({
+            text: item.str,
+            y: item.y,
+            fontSize: item.fontSize,
+            items: [{ x: item.x, width: item.width }]
+          })) };
+        }
         parent.postMessage({
           pluginMessage: {
             type: 'import-pdf-layout',
             pdfWidth: viewport.width,
             pdfHeight: viewport.height,
-            paragraphs,
+            ...payload,
             pageNum
           }
         }, '*');

@@ -20,7 +20,6 @@ figma.ui.onmessage = async (msg: {
     await figma.loadFontAsync({ family: "Inter", style: "Regular" });
     for (const para of msg.paragraphs) {
       if (para.text.trim().length === 0) continue;
-      // Calcular posição X e largura do parágrafo
       let paraX = 0;
       let paraWidth = msg.pdfWidth - 16;
       if (para.items && para.items.length > 0) {
