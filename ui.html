@@ -17,12 +17,17 @@
   <label style="display:block;margin-bottom:8px;">
     <input type="checkbox" id="group-toggle" checked /> Agrupar parágrafos automaticamente
   </label>
+  <label style="display:block;margin-bottom:8px;">
+    Máximo de frames por linha: <input type="number" id="max-frames-input" value="30" min="1" style="width:60px;" />
+  </label>
   <button id="import-btn">Importar</button>
   <script>
     document.getElementById('import-btn').onclick = async () => {
       const input = document.getElementById('pdf-input');
       const groupToggle = document.getElementById('group-toggle');
+      const maxFramesInput = document.getElementById('max-frames-input');
       const shouldGroup = groupToggle && groupToggle.checked;
+      const maxFramesPerRow = maxFramesInput ? parseInt(maxFramesInput.value, 10) : 30;
       if (input.files.length === 0) {
         parent.postMessage({ pluginMessage: { type: 'error', message: 'Selecione um arquivo PDF.' } }, '*');
         return;
@@ -108,7 +113,8 @@
             pdfWidth: viewport.width,
             pdfHeight: viewport.height,
             ...payload,
-            pageNum
+            pageNum,
+            maxFramesPerRow // envia para o backend
           }
         }, '*');
       }
