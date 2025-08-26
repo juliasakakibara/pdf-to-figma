@@ -14,21 +14,36 @@
 <body>
   <h2>Importar PDF</h2>
   <input type="file" id="pdf-input" accept="application/pdf" />
+  <label style="display:block;margin-bottom:8px;">
+    <input type="checkbox" id="group-toggle" checked /> Agrupar parágrafos automaticamente
+  </label>
+  <label style="display:block;margin-bottom:8px;">
+    Máximo de frames por linha: <input type="number" id="max-frames-input" value="30" min="1" style="width:60px;" />
+  </label>
   <button id="import-btn">Importar</button>
   <script>
     document.getElementById('import-btn').onclick = async () => {
       const input = document.getElementById('pdf-input');
+      const groupToggle = document.getElementById('group-toggle');
+      const maxFramesInput = document.getElementById('max-frames-input');
+      const shouldGroup = groupToggle && groupToggle.checked;
+      const maxFramesPerRow = maxFramesInput ? parseInt(maxFramesInput.value, 10) : 30;
       if (input.files.length === 0) {
         parent.postMessage({ pluginMessage: { type: 'error', message: 'Selecione um arquivo PDF.' } }, '*');
         return;
       }
       const file = input.files[0];
       const arrayBuffer = await file.arrayBuffer();
-      const pdf = await window['pdfjsLib'].getDocument({ data: arrayBuffer }).promise;
-
+      let pdf;
+      try {
+        pdf = await window['pdfjsLib'].getDocument({ data: arrayBuffer }).promise;
+      } catch (err) {
+        parent.postMessage({ pluginMessage: { type: 'error', message: 'Erro ao carregar o PDF. Tente outro arquivo ou verifique o formato.' } }, '*');
+        return;
+      }
       function extractParagraphs(items) {
         items.sort((a, b) => {
-          const yDiff = b.y - a.y;
+          const yDiff = a.y - b.y;
           if (Math.abs(yDiff) > 1) return yDiff;
           return a.x - b.x;
         });
@@ -36,32 +51,40 @@
         let currentParagraph = '';
         let lastItem = null;
         let paragraphY = items.length > 0 ? items[0].y : 0;
+        let paraItems = [];
         for (const item of items) {
           if (lastItem) {
             const lastY = lastItem.y;
             const currentY = item.y;
             const yDifference = Math.abs(currentY - lastY);
             if (yDifference > (lastItem.height * 1.5)) {
-              paragraphs.push({ text: currentParagraph.trim(), y: paragraphY, fontSize: lastItem.fontSize });
+              paragraphs.push({ text: currentParagraph.trim(), y: paragraphY, fontSize: lastItem.fontSize, items: paraItems });
               currentParagraph = '';
               paragraphY = currentY;
+              paraItems = [];
             } else if (item.x < lastItem.x) {
               currentParagraph += '\n';
             }
           }
           currentParagraph += item.str + ' ';
+          paraItems.push({ x: item.x, width: item.width });
           lastItem = item;
         }
         if (currentParagraph.trim() !== '') {
-          paragraphs.push({ text: currentParagraph.trim(), y: paragraphY, fontSize: lastItem ? lastItem.fontSize : 12 });
+          paragraphs.push({ text: currentParagraph.trim(), y: paragraphY, fontSize: lastItem ? lastItem.fontSize : 12, items: paraItems });
         }
         return paragraphs;
       }
-
       for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-        const page = await pdf.getPage(pageNum);
-        const viewport = page.getViewport({ scale: 1 });
-        const textContent = await page.getTextContent();
+        let page, viewport, textContent;
+        try {
+          page = await pdf.getPage(pageNum);
+          viewport = page.getViewport({ scale: 1 });
+          textContent = await page.getTextContent();
+        } catch (err) {
+          parent.postMessage({ pluginMessage: { type: 'error', message: `Erro ao processar página ${pageNum}.` } }, '*');
+          continue;
+        }
         const items = textContent.items.map(item => ({
           str: item.str,
           x: item.transform[4],
@@ -71,14 +94,27 @@
           height: item.height,
           hasEOL: item.hasEOL
         }));
-        const paragraphs = extractParagraphs(items);
+        let payload;
+        if (shouldGroup) {
+          const paragraphs = extractParagraphs(items);
+          payload = { paragraphs };
+        } else {
+          // Sem agrupamento: cada item vira um bloco de texto
+          payload = { paragraphs: items.map(item => ({
+            text: item.str,
+            y: item.y,
+            fontSize: item.fontSize,
+            items: [{ x: item.x, width: item.width }]
+          })) };
+        }
         parent.postMessage({
           pluginMessage: {
             type: 'import-pdf-layout',
             pdfWidth: viewport.width,
             pdfHeight: viewport.height,
-            paragraphs,
-            pageNum
+            ...payload,
+            pageNum,
+            maxFramesPerRow // envia para o backend
           }
         }, '*');
       }
